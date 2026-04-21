@@ -36,8 +36,8 @@ func NewPokemonService(fetcher PokemonFetcher, cache Cache) *PokemonService {
 	}
 }
 
-func (s *PokemonService) Register(name string, t domain.Translator) {
-	s.translators[name] = t
+func (s *PokemonService) Register(t domain.Translator) {
+	s.translators[t.Name()] = t
 }
 
 func (s *PokemonService) GetPokemon(ctx context.Context, name string) (domain.Pokemon, error) {
@@ -65,12 +65,17 @@ func (s *PokemonService) GetTranslatedPokemon(ctx context.Context, name string) 
 		return domain.Pokemon{}, err
 	}
 
-	translatorName := domain.ChooseTranslatorName(poke.Habitat, poke.IsLegendary)
-	translated, err := s.translateDescription(ctx, name, poke.Description, translatorName)
+	t, err := s.chooseTranslator(poke)
+	if err != nil {
+		slog.Warn("translation failed, no matching translator", "pokemon", name, "error", err)
+		return poke, err
+	}
+
+	translated, err := s.translateDescription(ctx, name, poke.Description, t)
 	if err != nil {
 		slog.Warn("translation failed, using standard description",
 			"pokemon", name,
-			"translator", translatorName,
+			"translator", t.Name(),
 			"error", err,
 		)
 	} else {
@@ -103,13 +108,21 @@ func (s *PokemonService) fetchSpecies(ctx context.Context, name string) (domain.
 	return result.(domain.Pokemon), nil
 }
 
-func (s *PokemonService) translateDescription(ctx context.Context, name, text string, translatorName string) (string, error) {
-	t, ok := s.translators[translatorName]
-	if !ok {
-		return "", fmt.Errorf("unknown translator: %s", translatorName)
+func (s *PokemonService) chooseTranslator(p domain.Pokemon) (domain.Translator, error) {
+	name := domain.TranslatorShakespeare
+	if p.Habitat == "cave" || p.IsLegendary {
+		name = domain.TranslatorYoda
 	}
 
-	sfKey := fmt.Sprintf("translate:%s:%s", name, translatorName)
+	t, ok := s.translators[name]
+	if !ok {
+		return nil, fmt.Errorf("unknown translator: %s", name)
+	}
+	return t, nil
+}
+
+func (s *PokemonService) translateDescription(ctx context.Context, pokemonName, text string, t domain.Translator) (string, error) {
+	sfKey := fmt.Sprintf("translate:%s:%s", pokemonName, t.Name())
 	result, err, _ := s.sfTransl.Do(sfKey, func() (any, error) {
 		return t.Translate(ctx, text)
 	})

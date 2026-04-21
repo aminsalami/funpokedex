@@ -9,5 +9,5 @@ FROM alpine:3.21
 RUN apk add --no-cache ca-certificates
 COPY --from=builder /pokedex /pokedex
 USER nobody
-EXPOSE 5000
+EXPOSE 8080
 ENTRYPOINT ["/pokedex"]

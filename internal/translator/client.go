@@ -1,39 +1,44 @@
 package translator
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
-	"net/url"
-	"strings"
 
+	"github.com/aminsalami/funpokedex/internal/domain"
 	"github.com/aminsalami/funpokedex/internal/pkg"
 )
 
 type FunTranslator struct {
+	name       string
 	httpClient *http.Client
 	baseURL    string
 	path       string
 	retryCfg   pkg.RetryConfig
 }
 
-func NewYodaTranslator(httpClient *http.Client, baseURL string) *FunTranslator {
-	return newFunTranslator(httpClient, baseURL, "yoda")
+func NewYodaTranslator(httpClient *http.Client) *FunTranslator {
+	return newFunTranslator(domain.TranslatorYoda, httpClient, "https://api.funtranslations.mercxry.me/v1/translate", "yoda")
 }
 
-func NewShakespeareTranslator(httpClient *http.Client, baseURL string) *FunTranslator {
-	return newFunTranslator(httpClient, baseURL, "shakespeare")
+func NewShakespeareTranslator(httpClient *http.Client) *FunTranslator {
+	return newFunTranslator(domain.TranslatorShakespeare, httpClient, "https://api.funtranslations.mercxry.me/v1/translate", "shakespeare")
 }
 
-func newFunTranslator(httpClient *http.Client, baseURL, path string) *FunTranslator {
+func newFunTranslator(name string, httpClient *http.Client, baseURL, path string) *FunTranslator {
 	return &FunTranslator{
+		name:       name,
 		httpClient: httpClient,
 		baseURL:    baseURL,
 		path:       path,
 		retryCfg:   pkg.DefaultRetryConfig(),
 	}
+}
+
+func (t *FunTranslator) Name() string {
+	return t.name
 }
 
 func (t *FunTranslator) Translate(ctx context.Context, text string) (string, error) {
@@ -43,14 +48,18 @@ func (t *FunTranslator) Translate(ctx context.Context, text string) (string, err
 }
 
 func (t *FunTranslator) translateOnce(ctx context.Context, text string) (string, error) {
-	endpoint := fmt.Sprintf("%s/translate/%s", t.baseURL, t.path)
+	endpoint := fmt.Sprintf("%s/%s", t.baseURL, t.path)
 
-	form := url.Values{"text": {text}}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(form.Encode()))
+	body, err := json.Marshal(translationRequest{Text: text})
+	if err != nil {
+		return "", fmt.Errorf("translator: marshal request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
 		return "", fmt.Errorf("translator: build request: %w", err)
 	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := t.httpClient.Do(req)
@@ -60,8 +69,11 @@ func (t *FunTranslator) translateOnce(ctx context.Context, text string) (string,
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		return "", fmt.Errorf("translator: returned %d: %s", resp.StatusCode, body)
+		var errResp translationErrorResponse
+		if err := json.NewDecoder(resp.Body).Decode(&errResp); err == nil && errResp.Error.Message != "" {
+			return "", fmt.Errorf("translator: %d: %s", errResp.Error.Code, errResp.Error.Message)
+		}
+		return "", fmt.Errorf("translator: unexpected status %d", resp.StatusCode)
 	}
 
 	var result translationResponse
@@ -76,10 +88,24 @@ func (t *FunTranslator) translateOnce(ctx context.Context, text string) (string,
 	return result.Contents.Translated, nil
 }
 
+type translationRequest struct {
+	Text string `json:"text"`
+}
+
 type translationResponse struct {
 	Contents translationContents `json:"contents"`
 }
 
 type translationContents struct {
-	Translated string `json:"translated"`
+	Translated  string `json:"translated"`
+	Text        string `json:"text"`
+	Translation string `json:"translation"`
+}
+
+type translationErrorResponse struct {
+	Error struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+	} `json:"error"`
+	RetryAfter int `json:"retry_after"`
 }

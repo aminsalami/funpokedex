@@ -8,24 +8,22 @@ import (
 )
 
 type Config struct {
-	Port                int
-	PokeAPIBaseURL      string
-	TranslationsBaseURL string
-	HTTPTimeout         time.Duration
-	CacheTTL            time.Duration
-	RateLimitRPS        float64
-	LogLevel            slog.Level
+	Port           int
+	PokeAPIBaseURL string
+	HTTPTimeout    time.Duration
+	CacheTTL       time.Duration
+	RateLimitRPS   float64
+	LogLevel       slog.Level
 }
 
 func Load() Config {
 	cfg := Config{
-		Port:                envInt("PORT", 5500),
-		PokeAPIBaseURL:      envStr("POKEAPI_BASE_URL", "https://pokeapi.co"),
-		TranslationsBaseURL: envStr("TRANSLATIONS_BASE_URL", "https://funtranslations.mercxry.me"),
-		HTTPTimeout:         envDuration("HTTP_TIMEOUT", 10*time.Second),
-		CacheTTL:            envDuration("CACHE_TTL", 5*time.Minute),
-		RateLimitRPS:        envFloat("RATE_LIMIT_RPS", 10),
-		LogLevel:            envLogLevel("LOG_LEVEL", slog.LevelInfo),
+		Port:           envInt("PORT", 8080),
+		PokeAPIBaseURL: envStr("POKEAPI_BASE_URL", "https://pokeapi.co"),
+		HTTPTimeout:    envDuration("HTTP_TIMEOUT", 10*time.Second),
+		CacheTTL:       envDuration("CACHE_TTL", 5*time.Minute),
+		RateLimitRPS:   envFloat("RATE_LIMIT_RPS", 10),
+		LogLevel:       envLogLevel("LOG_LEVEL", slog.LevelInfo),
 	}
 	return cfg
 }
