@@ -9,32 +9,41 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/aminsalami/funpokedex/internal/domain"
 	"github.com/aminsalami/funpokedex/internal/pkg"
 )
 
-type Client struct {
+type FunTranslator struct {
 	httpClient *http.Client
 	baseURL    string
+	path       string
 	retryCfg   pkg.RetryConfig
 }
 
-func NewClient(httpClient *http.Client, baseURL string) *Client {
-	return &Client{
+func NewYodaTranslator(httpClient *http.Client, baseURL string) *FunTranslator {
+	return newFunTranslator(httpClient, baseURL, "yoda")
+}
+
+func NewShakespeareTranslator(httpClient *http.Client, baseURL string) *FunTranslator {
+	return newFunTranslator(httpClient, baseURL, "shakespeare")
+}
+
+func newFunTranslator(httpClient *http.Client, baseURL, path string) *FunTranslator {
+	return &FunTranslator{
 		httpClient: httpClient,
 		baseURL:    baseURL,
+		path:       path,
 		retryCfg:   pkg.DefaultRetryConfig(),
 	}
 }
 
-func (c *Client) Translate(ctx context.Context, text string, typ domain.TranslatorType) (string, error) {
-	return pkg.Retry(ctx, c.retryCfg, func() (string, error) {
-		return c.translateOnce(ctx, text, typ)
+func (t *FunTranslator) Translate(ctx context.Context, text string) (string, error) {
+	return pkg.Retry(ctx, t.retryCfg, func() (string, error) {
+		return t.translateOnce(ctx, text)
 	}, func(_ error) bool { return true })
 }
 
-func (c *Client) translateOnce(ctx context.Context, text string, typ domain.TranslatorType) (string, error) {
-	endpoint := fmt.Sprintf("%s/translate/%s", c.baseURL, string(typ))
+func (t *FunTranslator) translateOnce(ctx context.Context, text string) (string, error) {
+	endpoint := fmt.Sprintf("%s/translate/%s", t.baseURL, t.path)
 
 	form := url.Values{"text": {text}}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(form.Encode()))
@@ -44,7 +53,7 @@ func (c *Client) translateOnce(ctx context.Context, text string, typ domain.Tran
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := t.httpClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("translator: request failed: %w", err)
 	}

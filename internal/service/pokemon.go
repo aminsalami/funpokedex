@@ -15,29 +15,29 @@ type PokemonFetcher interface {
 	FetchSpecies(ctx context.Context, name string) (domain.Pokemon, error)
 }
 
-type DescriptionTranslator interface {
-	Translate(ctx context.Context, text string, typ domain.TranslatorType) (string, error)
-}
-
 type Cache interface {
 	Get(key string) (any, bool)
 	Set(key string, value any)
 }
 
 type PokemonService struct {
-	fetcher    PokemonFetcher
-	translator DescriptionTranslator
-	cache      Cache
-	sfSpecies  singleflight.Group
-	sfTransl   singleflight.Group
+	fetcher     PokemonFetcher
+	translators map[string]domain.Translator
+	cache       Cache
+	sfSpecies   singleflight.Group
+	sfTransl    singleflight.Group
 }
 
-func NewPokemonService(fetcher PokemonFetcher, translator DescriptionTranslator, cache Cache) *PokemonService {
+func NewPokemonService(fetcher PokemonFetcher, cache Cache) *PokemonService {
 	return &PokemonService{
-		fetcher:    fetcher,
-		translator: translator,
-		cache:      cache,
+		fetcher:     fetcher,
+		translators: make(map[string]domain.Translator),
+		cache:       cache,
 	}
+}
+
+func (s *PokemonService) Register(name string, t domain.Translator) {
+	s.translators[name] = t
 }
 
 func (s *PokemonService) GetPokemon(ctx context.Context, name string) (domain.Pokemon, error) {
@@ -65,12 +65,12 @@ func (s *PokemonService) GetTranslatedPokemon(ctx context.Context, name string) 
 		return domain.Pokemon{}, err
 	}
 
-	translatorType := domain.ChooseTranslator(poke.Habitat, poke.IsLegendary)
-	translated, err := s.translateDescription(ctx, name, poke.Description, translatorType)
+	translatorName := domain.ChooseTranslatorName(poke.Habitat, poke.IsLegendary)
+	translated, err := s.translateDescription(ctx, name, poke.Description, translatorName)
 	if err != nil {
 		slog.Warn("translation failed, using standard description",
 			"pokemon", name,
-			"translator", string(translatorType),
+			"translator", translatorName,
 			"error", err,
 		)
 	} else {
@@ -103,11 +103,15 @@ func (s *PokemonService) fetchSpecies(ctx context.Context, name string) (domain.
 	return result.(domain.Pokemon), nil
 }
 
-func (s *PokemonService) translateDescription(ctx context.Context, name, text string, typ domain.TranslatorType) (string, error) {
-	sfKey := fmt.Sprintf("translate:%s:%s", name, typ)
+func (s *PokemonService) translateDescription(ctx context.Context, name, text string, translatorName string) (string, error) {
+	t, ok := s.translators[translatorName]
+	if !ok {
+		return "", fmt.Errorf("unknown translator: %s", translatorName)
+	}
 
+	sfKey := fmt.Sprintf("translate:%s:%s", name, translatorName)
 	result, err, _ := s.sfTransl.Do(sfKey, func() (any, error) {
-		return s.translator.Translate(ctx, text, typ)
+		return t.Translate(ctx, text)
 	})
 	if err != nil {
 		return "", err

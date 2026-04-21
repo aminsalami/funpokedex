@@ -30,9 +30,10 @@ func main() {
 	cache := pkg.NewTTLCache(cfg.CacheTTL)
 
 	pokeClient := pokeapi.NewClient(httpClient, cfg.PokeAPIBaseURL)
-	translClient := translator.NewClient(httpClient, cfg.TranslationsBaseURL)
 
-	svc := service.NewPokemonService(pokeClient, translClient, cache)
+	svc := service.NewPokemonService(pokeClient, cache)
+	svc.Register("yoda", translator.NewYodaTranslator(httpClient, cfg.TranslationsBaseURL))
+	svc.Register("shakespeare", translator.NewShakespeareTranslator(httpClient, cfg.TranslationsBaseURL))
 	h := handler.NewHandler(svc)
 
 	mux := http.NewServeMux()

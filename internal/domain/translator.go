@@ -1,13 +1,17 @@
 package domain
 
-type TranslatorType string
+import "context"
+
+type Translator interface {
+	Translate(ctx context.Context, text string) (string, error)
+}
 
 const (
-	TranslatorYoda        TranslatorType = "yoda"
-	TranslatorShakespeare TranslatorType = "shakespeare"
+	TranslatorYoda        = "yoda"
+	TranslatorShakespeare = "shakespeare"
 )
 
-func ChooseTranslator(habitat string, isLegendary bool) TranslatorType {
+func ChooseTranslatorName(habitat string, isLegendary bool) string {
 	if habitat == "cave" || isLegendary {
 		return TranslatorYoda
 	}
