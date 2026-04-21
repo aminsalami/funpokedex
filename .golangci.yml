@@ -1,0 +1,11 @@
+linters:
+  enable:
+    - govet
+    - errcheck
+    - staticcheck
+    - gosimple
+    - unused
+
+linters-settings:
+  lll:
+    line-length: 160
