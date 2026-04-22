@@ -6,33 +6,44 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/aminsalami/funpokedex/internal/domain"
 	"github.com/aminsalami/funpokedex/internal/pkg"
 )
 
+const (
+	defaultYodaURL        = "https://api.funtranslations.mercxry.me/v1/translate/yoda"
+	defaultShakespeareURL = "https://api.funtranslations.mercxry.me/v1/translate/shakespeare"
+)
+
 type FunTranslator struct {
 	name       string
 	httpClient *http.Client
-	baseURL    string
-	path       string
+	endpoint   string
 	retryCfg   pkg.RetryConfig
 }
 
-func NewYodaTranslator(httpClient *http.Client) *FunTranslator {
-	return newFunTranslator(domain.TranslatorYoda, httpClient, "https://api.funtranslations.mercxry.me/v1/translate", "yoda")
+func NewYodaTranslator(httpClient *http.Client, urlOverride string) *FunTranslator {
+	return newFunTranslator(domain.TranslatorYoda, httpClient, urlOverride, defaultYodaURL)
 }
 
-func NewShakespeareTranslator(httpClient *http.Client) *FunTranslator {
-	return newFunTranslator(domain.TranslatorShakespeare, httpClient, "https://api.funtranslations.mercxry.me/v1/translate", "shakespeare")
+func NewShakespeareTranslator(httpClient *http.Client, urlOverride string) *FunTranslator {
+	return newFunTranslator(domain.TranslatorShakespeare, httpClient, urlOverride, defaultShakespeareURL)
 }
 
-func newFunTranslator(name string, httpClient *http.Client, baseURL, path string) *FunTranslator {
+func newFunTranslator(name string, httpClient *http.Client, urlOverride, defaultURL string) *FunTranslator {
+	endpoint := defaultURL
+	if urlOverride != "" {
+		if _, err := url.ParseRequestURI(urlOverride); err != nil {
+			panic(fmt.Sprintf("translator %s: invalid URL %q: %v", name, urlOverride, err))
+		}
+		endpoint = urlOverride
+	}
 	return &FunTranslator{
 		name:       name,
 		httpClient: httpClient,
-		baseURL:    baseURL,
-		path:       path,
+		endpoint:   endpoint,
 		retryCfg:   pkg.DefaultRetryConfig(),
 	}
 }
@@ -48,7 +59,7 @@ func (t *FunTranslator) Translate(ctx context.Context, text string) (string, err
 }
 
 func (t *FunTranslator) translateOnce(ctx context.Context, text string) (string, error) {
-	endpoint := fmt.Sprintf("%s/%s", t.baseURL, t.path)
+	endpoint := t.endpoint
 
 	body, err := json.Marshal(translationRequest{Text: text})
 	if err != nil {

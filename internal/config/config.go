@@ -14,6 +14,9 @@ type Config struct {
 	CacheTTL       time.Duration
 	RateLimitRPS   float64
 	LogLevel       slog.Level
+
+	YodaTranslatorURL        string
+	ShakespeareTranslatorURL string
 }
 
 func Load() Config {
@@ -24,6 +27,9 @@ func Load() Config {
 		CacheTTL:       envDuration("CACHE_TTL", 5*time.Minute),
 		RateLimitRPS:   envFloat("RATE_LIMIT_RPS", 10),
 		LogLevel:       envLogLevel("LOG_LEVEL", slog.LevelInfo),
+
+		YodaTranslatorURL:        os.Getenv("YODA_TRANSLATOR_URL"),
+		ShakespeareTranslatorURL: os.Getenv("SHAKESPEARE_TRANSLATOR_URL"),
 	}
 	return cfg
 }
