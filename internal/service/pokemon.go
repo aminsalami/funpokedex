@@ -78,10 +78,10 @@ func (s *PokemonService) GetTranslatedPokemon(ctx context.Context, name string) 
 			"translator", t.Name(),
 			"error", err,
 		)
-	} else {
-		poke.Description = translated
+		return poke, nil
 	}
 
+	poke.Description = translated
 	s.cache.Set(cacheKey, poke)
 	return poke, nil
 }
