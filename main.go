@@ -27,7 +27,7 @@ func main() {
 	slog.SetDefault(logger)
 
 	httpClient := pkg.NewHTTPClient(cfg.HTTPTimeout)
-	cache := pkg.NewTTLCache(cfg.CacheTTL)
+	cache := pkg.NewInMemoryCache(cfg.CacheTTL)
 
 	pokeClient := pokeapi.NewClient(httpClient, cfg.PokeAPIBaseURL)
 

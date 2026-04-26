@@ -10,20 +10,20 @@ type cacheEntry struct {
 	expiresAt time.Time
 }
 
-type TTLCache struct {
+type InMemoryCache struct {
 	mu      sync.RWMutex
 	entries map[string]cacheEntry
 	ttl     time.Duration
 }
 
-func NewTTLCache(ttl time.Duration) *TTLCache {
-	return &TTLCache{
+func NewInMemoryCache(ttl time.Duration) *InMemoryCache {
+	return &InMemoryCache{
 		entries: make(map[string]cacheEntry),
 		ttl:     ttl,
 	}
 }
 
-func (c *TTLCache) Get(key string) (any, bool) {
+func (c *InMemoryCache) Get(key string) (any, bool) {
 	c.mu.RLock()
 	entry, ok := c.entries[key]
 	c.mu.RUnlock()
@@ -42,7 +42,7 @@ func (c *TTLCache) Get(key string) (any, bool) {
 	return entry.value, true
 }
 
-func (c *TTLCache) Set(key string, value any) {
+func (c *InMemoryCache) Set(key string, value any) {
 	c.mu.Lock()
 	c.entries[key] = cacheEntry{
 		value:     value,
