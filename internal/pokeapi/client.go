@@ -50,6 +50,10 @@ func (c *Client) fetchSpeciesOnce(ctx context.Context, name string) (domain.Poke
 	if resp.StatusCode == http.StatusNotFound {
 		return domain.Pokemon{}, domain.ErrNotFound(name)
 	}
+	if resp.StatusCode >= 400 && resp.StatusCode < 500 {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return domain.Pokemon{}, domain.ErrBadRequest(fmt.Sprintf("pokeapi returned %d: %s", resp.StatusCode, body))
+	}
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
 		return domain.Pokemon{}, domain.ErrUpstream(fmt.Errorf("pokeapi returned %d: %s", resp.StatusCode, body))
